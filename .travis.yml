@@ -1,0 +1,13 @@
+language: go
+
+go:
+  - 1.7
+
+install:
+  - go get -v resenje.org/email
+
+before_script:
+  - go vet -v resenje.org/email/...
+
+script:
+  - go test -v resenje.org/email/...
