@@ -35,23 +35,7 @@ type Service struct {
 
 // SendEmail sends an email message.
 func (s Service) SendEmail(from string, to []string, subject string, body string) error {
-	m := gomail.NewMessage()
-	m.SetHeader("From", from)
-	m.SetHeader("To", to...)
-	m.SetHeader("Subject", subject)
-	m.SetBody("text/plain", body)
-
-	d := gomail.NewPlainDialer(
-		s.SMTPHost,
-		s.SMTPPort,
-		s.SMTPUsername,
-		s.SMTPPassword,
-	)
-	d.LocalName = s.SMTPIdentity
-	if s.SMTPSkipVerify {
-		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
-	}
-	return d.DialAndSend(m)
+	return s.SendEmailWithHeaders(from, to, subject, body, nil)
 }
 
 // SendEmail sends an email message with additional headers.
