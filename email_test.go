@@ -111,6 +111,7 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 				t.Log("Date:", m.Header.Get("Date"))
 				t.Log("From:", m.Header.Get("From"))
 				t.Log("To:", m.Header.Get("To"))
+				t.Log("Reply-To:", m.Header.Get("Reply-To"))
 				t.Log("Subject:", m.Header.Get("Subject"))
 
 				body, err := ioutil.ReadAll(m.Body)
@@ -267,6 +268,55 @@ func TestService(t *testing.T) {
 		recordedFrom := recorder.Message.From.String()
 		if recordedFrom != defaultFrom && recordedFrom != "<"+defaultFrom+">" {
 			t.Errorf("message from: expected %s, got %s", defaultFrom, recordedFrom)
+		}
+
+		for _, pt := range notifyTo {
+			found := false
+			for _, rt := range recorder.Message.To {
+				if pt == rt.String() || "<"+pt+">" == rt.String() {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("recipient not found %s", pt)
+			}
+		}
+
+		recordedSubject := recorder.Message.Subject
+		if recordedSubject != subject {
+			t.Errorf(`message subject: expected "%s", got "%s"`, subject, recordedSubject)
+		}
+
+		recordedBody := recorder.Message.Body
+		if recordedBody != body+"\r\n" {
+			t.Errorf(`message body: expected "%v", got "%v"`, body, recordedBody)
+		}
+	})
+
+	t.Run("NotifyWithHeaders", func(t *testing.T) {
+		if err := service.NotifyWithHeaders(subject, body, map[string][]string{
+			"Reply-To": replyTo,
+		}); err != nil {
+			t.Errorf("send email: %s", err)
+		}
+
+		recordedFrom := recorder.Message.From.String()
+		if recordedFrom != defaultFrom && recordedFrom != "<"+defaultFrom+">" {
+			t.Errorf("message from: expected %s, got %s", defaultFrom, recordedFrom)
+		}
+
+		for _, pt := range notifyTo {
+			found := false
+			for _, rt := range recorder.Message.To {
+				if pt == rt.String() || "<"+pt+">" == rt.String() {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("recipient not found %s", pt)
+			}
 		}
 
 		for _, pt := range notifyTo {
