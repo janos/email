@@ -131,6 +131,10 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 				if err != nil {
 					log.Fatal(err)
 				}
+				message.ReplyTo, err = m.Header.AddressList("Reply-To")
+				if err != nil && err != mail.ErrHeaderNotPresent {
+					log.Fatal(err)
+				}
 				message.Subject = m.Header.Get("Subject")
 				message.Body = string(body)
 
@@ -145,6 +149,7 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 type SMTPMessage struct {
 	From    *mail.Address
 	To      []*mail.Address
+	ReplyTo []*mail.Address
 	Subject string
 	Body    string
 }
@@ -158,6 +163,7 @@ func TestService(t *testing.T) {
 	from := `"Gopher" <gopher@gopherpit.com>`
 	defaultFrom := `noreply@gopherpit.com`
 	to := []string{`"GopherPit Support" <support@gopherpit.com>`, "contact@gopherpit.com"}
+	replyTo := []string{`"GopherPit Operations" <operations@gopherpit.com>`, "archive@gopherpit.com"}
 	notifyTo := []string{`"GopherPit Operations" <operations@gopherpit.com>`}
 	subject := "test subject"
 	body := "test body"
@@ -190,6 +196,55 @@ func TestService(t *testing.T) {
 			}
 			if !found {
 				t.Errorf("recipient not found %s", pt)
+			}
+		}
+
+		recordedSubject := recorder.Message.Subject
+		if recordedSubject != subject {
+			t.Errorf(`message subject: expected "%s", got "%s"`, subject, recordedSubject)
+		}
+
+		recordedBody := recorder.Message.Body
+		if recordedBody != body+"\r\n" {
+			t.Errorf(`message body: expected "%v", got "%v"`, body, recordedBody)
+		}
+	})
+
+	t.Run("SendEmailWithHeaders", func(t *testing.T) {
+		if err := service.SendEmailWithHeaders(from, to, subject, body, map[string][]string{
+			"Reply-To": replyTo,
+		}); err != nil {
+			t.Errorf("send email: %s", err)
+		}
+
+		recordedFrom := recorder.Message.From.String()
+		if recordedFrom != from && recordedFrom != "<"+defaultFrom+">" {
+			t.Errorf("message from: expected %s, got %s", from, recordedFrom)
+		}
+
+		for _, pt := range to {
+			found := false
+			for _, rt := range recorder.Message.To {
+				if pt == rt.String() || "<"+pt+">" == rt.String() {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("recipient not found %s", pt)
+			}
+		}
+
+		for _, pt := range replyTo {
+			found := false
+			for _, rt := range recorder.Message.ReplyTo {
+				if pt == rt.String() || "<"+pt+">" == rt.String() {
+					found = true
+					break
+				}
+			}
+			if !found {
+				t.Errorf("reply to recipient not found %s", pt)
 			}
 		}
 

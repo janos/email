@@ -54,6 +54,28 @@ func (s Service) SendEmail(from string, to []string, subject string, body string
 	return d.DialAndSend(m)
 }
 
+// SendEmail sends an email message with additional headers.
+func (s Service) SendEmailWithHeaders(from string, to []string, subject string, body string, headers map[string][]string) error {
+	m := gomail.NewMessage()
+	m.SetHeaders(headers)
+	m.SetHeader("From", from)
+	m.SetHeader("To", to...)
+	m.SetHeader("Subject", subject)
+	m.SetBody("text/plain", body)
+
+	d := gomail.NewPlainDialer(
+		s.SMTPHost,
+		s.SMTPPort,
+		s.SMTPUsername,
+		s.SMTPPassword,
+	)
+	d.LocalName = s.SMTPIdentity
+	if s.SMTPSkipVerify {
+		d.TLSConfig = &tls.Config{InsecureSkipVerify: true}
+	}
+	return d.DialAndSend(m)
+}
+
 // Notify sends an email message to Service.NotifyAddresses.
 func (s Service) Notify(subject, body string) error {
 	if len(s.NotifyAddresses) == 0 {
