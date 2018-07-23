@@ -8,7 +8,7 @@ package email // import "resenje.org/email"
 import (
 	"crypto/tls"
 
-	"gopkg.in/gomail.v2"
+	"gopkg.in/mail.v2"
 )
 
 // Service provides functionality to send emails over SMTP server.
@@ -40,14 +40,14 @@ func (s Service) SendEmail(from string, to []string, subject string, body string
 
 // SendEmailWithHeaders sends an email message with additional headers.
 func (s Service) SendEmailWithHeaders(from string, to []string, subject string, body string, headers map[string][]string) error {
-	m := gomail.NewMessage()
+	m := mail.NewMessage()
 	m.SetHeaders(headers)
 	m.SetHeader("From", from)
 	m.SetHeader("To", to...)
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/plain", body)
 
-	d := gomail.NewPlainDialer(
+	d := mail.NewPlainDialer(
 		s.SMTPHost,
 		s.SMTPPort,
 		s.SMTPUsername,
