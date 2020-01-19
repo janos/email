@@ -12,21 +12,23 @@ import (
 	"net"
 	"net/mail"
 	"strings"
+	"sync"
 	"testing"
 )
 
-type SMTPRecorder struct {
+type smtpRecorder struct {
 	Port    int
-	Message *SMTPMessage
+	message *smtpMessage
+	mu      sync.Mutex
 }
 
-func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
+func newSMTPRecorder(t *testing.T) (*smtpRecorder, error) {
 	l, err := net.Listen("tcp", "")
 	if err != nil {
 		return nil, err
 	}
 
-	recorder := &SMTPRecorder{
+	recorder := &smtpRecorder{
 		Port: l.Addr().(*net.TCPAddr).Port,
 	}
 
@@ -131,7 +133,7 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 				}
 				t.Logf("%s", body)
 
-				message := SMTPMessage{}
+				message := smtpMessage{}
 				from, err := m.Header.AddressList("From")
 				if err != nil {
 					panic(err)
@@ -150,7 +152,7 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 				message.Subject = m.Header.Get("Subject")
 				message.Body = string(body)
 
-				recorder.Message = &message
+				recorder.SetMessage(&message)
 			}(conn)
 		}
 	}()
@@ -158,7 +160,19 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 	return recorder, nil
 }
 
-type SMTPMessage struct {
+func (r *smtpRecorder) Message() *smtpMessage {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return r.message
+}
+
+func (r *smtpRecorder) SetMessage(m *smtpMessage) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.message = m
+}
+
+type smtpMessage struct {
 	From    *mail.Address
 	To      []*mail.Address
 	ReplyTo []*mail.Address
@@ -167,7 +181,7 @@ type SMTPMessage struct {
 }
 
 func TestService(t *testing.T) {
-	recorder, err := NewSMTPRecorder(t)
+	recorder, err := newSMTPRecorder(t)
 	if err != nil {
 		t.Fatalf("smtp listen: %s", err)
 	}
@@ -193,14 +207,14 @@ func TestService(t *testing.T) {
 			t.Errorf("send email: %s", err)
 		}
 
-		recordedFrom := recorder.Message.From.String()
+		recordedFrom := recorder.Message().From.String()
 		if recordedFrom != from && recordedFrom != "<"+defaultFrom+">" {
 			t.Errorf("message from: expected %s, got %s", from, recordedFrom)
 		}
 
 		for _, pt := range to {
 			found := false
-			for _, rt := range recorder.Message.To {
+			for _, rt := range recorder.Message().To {
 				if pt == rt.String() || "<"+pt+">" == rt.String() {
 					found = true
 					break
@@ -211,12 +225,12 @@ func TestService(t *testing.T) {
 			}
 		}
 
-		recordedSubject := recorder.Message.Subject
+		recordedSubject := recorder.Message().Subject
 		if recordedSubject != subject {
 			t.Errorf(`message subject: expected "%s", got "%s"`, subject, recordedSubject)
 		}
 
-		recordedBody := recorder.Message.Body
+		recordedBody := recorder.Message().Body
 		if recordedBody != body+"\r\n" {
 			t.Errorf(`message body: expected "%v", got "%v"`, body, recordedBody)
 		}
@@ -229,14 +243,14 @@ func TestService(t *testing.T) {
 			t.Errorf("send email: %s", err)
 		}
 
-		recordedFrom := recorder.Message.From.String()
+		recordedFrom := recorder.Message().From.String()
 		if recordedFrom != from && recordedFrom != "<"+defaultFrom+">" {
 			t.Errorf("message from: expected %s, got %s", from, recordedFrom)
 		}
 
 		for _, pt := range to {
 			found := false
-			for _, rt := range recorder.Message.To {
+			for _, rt := range recorder.Message().To {
 				if pt == rt.String() || "<"+pt+">" == rt.String() {
 					found = true
 					break
@@ -249,7 +263,7 @@ func TestService(t *testing.T) {
 
 		for _, pt := range replyTo {
 			found := false
-			for _, rt := range recorder.Message.ReplyTo {
+			for _, rt := range recorder.Message().ReplyTo {
 				if pt == rt.String() || "<"+pt+">" == rt.String() {
 					found = true
 					break
@@ -260,12 +274,12 @@ func TestService(t *testing.T) {
 			}
 		}
 
-		recordedSubject := recorder.Message.Subject
+		recordedSubject := recorder.Message().Subject
 		if recordedSubject != subject {
 			t.Errorf(`message subject: expected "%s", got "%s"`, subject, recordedSubject)
 		}
 
-		recordedBody := recorder.Message.Body
+		recordedBody := recorder.Message().Body
 		if recordedBody != body+"\r\n" {
 			t.Errorf(`message body: expected "%v", got "%v"`, body, recordedBody)
 		}
@@ -276,14 +290,14 @@ func TestService(t *testing.T) {
 			t.Errorf("send email: %s", err)
 		}
 
-		recordedFrom := recorder.Message.From.String()
+		recordedFrom := recorder.Message().From.String()
 		if recordedFrom != defaultFrom && recordedFrom != "<"+defaultFrom+">" {
 			t.Errorf("message from: expected %s, got %s", defaultFrom, recordedFrom)
 		}
 
 		for _, pt := range notifyTo {
 			found := false
-			for _, rt := range recorder.Message.To {
+			for _, rt := range recorder.Message().To {
 				if pt == rt.String() || "<"+pt+">" == rt.String() {
 					found = true
 					break
@@ -294,12 +308,12 @@ func TestService(t *testing.T) {
 			}
 		}
 
-		recordedSubject := recorder.Message.Subject
+		recordedSubject := recorder.Message().Subject
 		if recordedSubject != subject {
 			t.Errorf(`message subject: expected "%s", got "%s"`, subject, recordedSubject)
 		}
 
-		recordedBody := recorder.Message.Body
+		recordedBody := recorder.Message().Body
 		if recordedBody != body+"\r\n" {
 			t.Errorf(`message body: expected "%v", got "%v"`, body, recordedBody)
 		}
@@ -312,14 +326,14 @@ func TestService(t *testing.T) {
 			t.Errorf("send email: %s", err)
 		}
 
-		recordedFrom := recorder.Message.From.String()
+		recordedFrom := recorder.Message().From.String()
 		if recordedFrom != defaultFrom && recordedFrom != "<"+defaultFrom+">" {
 			t.Errorf("message from: expected %s, got %s", defaultFrom, recordedFrom)
 		}
 
 		for _, pt := range notifyTo {
 			found := false
-			for _, rt := range recorder.Message.To {
+			for _, rt := range recorder.Message().To {
 				if pt == rt.String() || "<"+pt+">" == rt.String() {
 					found = true
 					break
@@ -332,7 +346,7 @@ func TestService(t *testing.T) {
 
 		for _, pt := range notifyTo {
 			found := false
-			for _, rt := range recorder.Message.To {
+			for _, rt := range recorder.Message().To {
 				if pt == rt.String() || "<"+pt+">" == rt.String() {
 					found = true
 					break
@@ -343,25 +357,25 @@ func TestService(t *testing.T) {
 			}
 		}
 
-		recordedSubject := recorder.Message.Subject
+		recordedSubject := recorder.Message().Subject
 		if recordedSubject != subject {
 			t.Errorf(`message subject: expected "%s", got "%s"`, subject, recordedSubject)
 		}
 
-		recordedBody := recorder.Message.Body
+		recordedBody := recorder.Message().Body
 		if recordedBody != body+"\r\n" {
 			t.Errorf(`message body: expected "%v", got "%v"`, body, recordedBody)
 		}
 	})
 
 	t.Run("NotifyNoOp", func(t *testing.T) {
-		recorder.Message = nil
+		recorder.SetMessage(nil)
 		service.NotifyAddresses = nil
 		if err := service.Notify(subject, body); err != nil {
 			t.Errorf("send email: %s", err)
 		}
-		if recorder.Message != nil {
-			t.Errorf("expected no-op, but message %#v has been recorded", recorder.Message)
+		if recorder.Message() != nil {
+			t.Errorf("expected no-op, but message %#v has been recorded", recorder.Message())
 		}
 	})
 }
