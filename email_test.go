@@ -9,7 +9,6 @@ import (
 	"bufio"
 	"bytes"
 	"io/ioutil"
-	"log"
 	"net"
 	"net/mail"
 	"strings"
@@ -35,7 +34,7 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 		for {
 			conn, err := l.Accept()
 			if err != nil {
-				t.Fatal(err)
+				panic(err)
 			}
 			go func(conn net.Conn) {
 				defer conn.Close()
@@ -43,40 +42,48 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 				reader := bufio.NewReader(conn)
 				writer := bufio.NewWriter(conn)
 
-				writer.WriteString("220 Welcome\r\n")
+				if _, err := writer.WriteString("220 Welcome\r\n"); err != nil {
+					panic(err)
+				}
 				writer.Flush()
 
 				s, err := reader.ReadString('\n')
 				if err != nil {
-					t.Fatal(err)
+					panic(err)
 				}
 				t.Log(strings.TrimSpace(s))
 
-				writer.WriteString("250 Hello\r\n")
+				if _, err := writer.WriteString("250 Hello\r\n"); err != nil {
+					panic(err)
+				}
 				writer.Flush()
 
 				s, err = reader.ReadString('\n')
 				if err != nil {
-					t.Fatal(err)
+					panic(err)
 				}
 				t.Log(strings.TrimSpace(s))
 
-				writer.WriteString("250 Sender\r\n")
+				if _, err := writer.WriteString("250 Sender\r\n"); err != nil {
+					panic(err)
+				}
 				writer.Flush()
 
 				s, err = reader.ReadString('\n')
 				if err != nil {
-					t.Fatal(err)
+					panic(err)
 				}
 				t.Log(strings.TrimSpace(s))
 
 				for {
-					writer.WriteString("250 Recipient\r\n")
+					if _, err := writer.WriteString("250 Recipient\r\n"); err != nil {
+						panic(err)
+					}
 					writer.Flush()
 
 					s, err = reader.ReadString('\n')
 					if err != nil {
-						t.Fatal(err)
+						panic(err)
 					}
 					s = strings.TrimSpace(s)
 					t.Log(s)
@@ -86,13 +93,15 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 					}
 				}
 
-				writer.WriteString("354 OK send data ending with <CRLF>.<CRLF>\r\n")
+				if _, err := writer.WriteString("354 OK send data ending with <CRLF>.<CRLF>\r\n"); err != nil {
+					panic(err)
+				}
 				writer.Flush()
 				data := []byte{}
 				for {
 					d, err := reader.ReadSlice('\n')
 					if err != nil {
-						t.Fatal(err)
+						panic(err)
 					}
 					if d[0] == 46 && d[1] == 13 && d[2] == 10 {
 						break
@@ -100,12 +109,14 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 					data = append(data, d...)
 				}
 
-				writer.WriteString("250 Server has transmitted the message\n\r")
+				if _, err := writer.WriteString("250 Server has transmitted the message\n\r"); err != nil {
+					panic(err)
+				}
 				writer.Flush()
 
 				m, err := mail.ReadMessage(bytes.NewReader(data))
 				if err != nil {
-					log.Fatal(err)
+					panic(err)
 				}
 
 				t.Log("Date:", m.Header.Get("Date"))
@@ -116,25 +127,25 @@ func NewSMTPRecorder(t *testing.T) (*SMTPRecorder, error) {
 
 				body, err := ioutil.ReadAll(m.Body)
 				if err != nil {
-					log.Fatal(err)
+					panic(err)
 				}
 				t.Logf("%s", body)
 
 				message := SMTPMessage{}
 				from, err := m.Header.AddressList("From")
 				if err != nil {
-					log.Fatal(err)
+					panic(err)
 				}
 				if len(from) > 0 {
 					message.From = from[0]
 				}
 				message.To, err = m.Header.AddressList("To")
 				if err != nil {
-					log.Fatal(err)
+					panic(err)
 				}
 				message.ReplyTo, err = m.Header.AddressList("Reply-To")
 				if err != nil && err != mail.ErrHeaderNotPresent {
-					log.Fatal(err)
+					panic(err)
 				}
 				message.Subject = m.Header.Get("Subject")
 				message.Body = string(body)
