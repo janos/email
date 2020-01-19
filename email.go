@@ -47,7 +47,7 @@ func (s Service) SendEmailWithHeaders(from string, to []string, subject string, 
 	m.SetHeader("Subject", subject)
 	m.SetBody("text/plain", body)
 
-	d := mail.NewPlainDialer(
+	d := mail.NewDialer(
 		s.SMTPHost,
 		s.SMTPPort,
 		s.SMTPUsername,
